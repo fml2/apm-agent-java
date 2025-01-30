@@ -11,9 +11,8 @@ set -eo pipefail
 # Make sure we delete this folder before leaving even in case of failure
 clean_up () {
   ARG=$?
-  export VAULT_TOKEN=$PREVIOUS_VAULT_TOKEN
   echo "--- Deleting tmp workspace"
-  rm -rf $TMP_WORKSPACE
+  rm -rf $TMP_WORKSPACE || true
   exit $ARG
 }
 trap clean_up EXIT
@@ -24,9 +23,20 @@ echo $PATH
 java -version
 
 set +x
-echo "--- Deploy the snapshot :package:"
-if [[ "$dry_run" == "true" ]] ; then
-  echo './mvnw -V -s .ci/settings.xml -Pgpg clean deploy -DskipTests --batch-mode'
-else
-  ./mvnw -V -s .ci/settings.xml -Pgpg clean deploy -DskipTests --batch-mode | tee snapshot.txt
+# Default in dry-run mode
+GOAL="install"
+DRY_RUN_MSG="(dry-run)"
+# Otherwise, a snapshot
+if [[ "$dry_run" == "false" ]] ; then
+  GOAL="deploy"
+  DRY_RUN_MSG=""
 fi
+
+echo "--- Deploy the snapshot :package: [./mvnw $GOAL)] $DRY_RUN_MSG"
+./mvnw -V -s .ci/settings.xml -Pgpg clean $GOAL -DskipTests --batch-mode | tee snapshot.txt
+
+echo "--- Archive the target folder with jar files"
+echo 'gather artifacts'
+.ci/published-artifacts-list.sh | tee artifacts.list
+echo 'create tarbal'
+tar -cvf "${TARBALL_FILE:-artifacts.tar}" -T artifacts.list

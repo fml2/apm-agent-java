@@ -63,6 +63,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/maven-goal
@@ -74,21 +75,21 @@ jobs:
           path: ${{ github.workspace }}
 
       - name: Upload agent binaries as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: elastic-apm-agent
           path: |
             ./elastic-apm-agent/target/elastic-apm-agent-*.jar
             !./**/*-sources.jar
       - name: Upload agent java 8 binaries as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: elastic-apm-agent-java8
           path: |
             ./elastic-apm-agent-java8/target/elastic-apm-agent-java8-*.jar
             !./**/*-sources.jar
       - name: Upload agent attach CLI artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: apm-agent-attach-cli
           path: |
@@ -96,28 +97,28 @@ jobs:
             !./**/*-sources.jar
             !./**/*-tests.jar
       - name: Upload agent attach artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: apm-agent-attach
           path: |
             ./apm-agent-attach/target/apm-agent-attach-*.jar
             !./**/*-sources.jar
       - name: Upload agent API artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: apm-agent-api
           path: |
             ./apm-agent-api/target/apm-agent-api-*.jar
             !./**/*-sources.jar
       - name: Upload agent plugin SDK artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: apm-agent-plugin-sdk
           path: |
             ./apm-agent-plugin-sdk/target/apm-agent-plugin-sdk-*.jar
             !./**/*-sources.jar
       - name: Upload benchmark binaries as artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: apm-agent-benchmarks
           path: |
@@ -128,6 +129,7 @@ jobs:
     name: License
     runs-on: ubuntu-latest
     needs: build
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/unstash
@@ -148,6 +150,7 @@ jobs:
     # When undefined, we need to emulate the default value
     if: inputs.test_ci == true || inputs.test_ci == null
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -160,15 +163,16 @@ jobs:
           command: ./mvnw test -DargLine="-Delastic.apm.overwrite.config.docs=false"
       - name: Store test results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-JUnit
           path: |
             **/junit-*.xml
             **/TEST-*.xml
 
   non-app-server-integration-tests:
     name: Non-Application Server integration tests
+    timeout-minutes: 60
     if: |
       contains(github.event.pull_request.labels.*.name, 'ci:agent-integration')
       || github.event.pull_request.draft == false
@@ -198,21 +202,21 @@ jobs:
           command: ./mvnw -q -P ci-non-application-server-integration-tests verify
       - name: Store test results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-non-app-server-integration
           path: |
             **/junit-*.xml
             **/TEST-*.xml
 
   app-server-integration-tests:
     name: Application Server integration tests
+    timeout-minutes: 60
     if: |
       contains(github.event.pull_request.labels.*.name, 'ci:agent-integration')
       || github.event.pull_request.draft == false
       || inputs.agent_integration_tests_ci == true
-    # Pinned to ubuntu 20.04 until https://github.com/elastic/apm-agent-java/issues/3035 is solved.
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -237,9 +241,9 @@ jobs:
           command: ./mvnw -q -P ci-application-server-integration-tests verify
       - name: Store test results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-app-server-integration
           path: |
             **/junit-*.xml
             **/TEST-*.xml
@@ -248,6 +252,7 @@ jobs:
     name: Javadoc
     runs-on: ubuntu-latest
     needs: build
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/unstash
@@ -260,6 +265,7 @@ jobs:
 
   unit-tests-windows:
     name: Build & Test Windows
+    timeout-minutes: 60
     # Inputs aren't defined on some events
     # When undefined, we need to emulate the default value
     if: |
@@ -278,15 +284,16 @@ jobs:
         run: ./mvnw test
       - name: Store test results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-windows
           path: |
             **/junit-*.xml
             **/TEST-*.xml
 
   jdk-compatibility-tests:
     name: JDK Compatibility Tests
+    timeout-minutes: 60
     if: |
       contains(github.event.pull_request.labels.*.name, 'ci:jdk-compatibility')
       || inputs.jdk_compatibility_ci == true
@@ -301,11 +308,11 @@ jobs:
             distribution: 'temurin'
           - version: 21
             distribution: 'temurin'
-          - version: 22-ea
+          - version: 23
             distribution: 'temurin'
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/workflows/maven-goal
+      - uses: ./.github/workflows/maven-goal-jdk
         with:
           test-java-version: ${{ matrix.version }}
           test-java-distribution: ${{ matrix.distribution }}
@@ -314,9 +321,44 @@ jobs:
         run: ./mvnw test -Delastic.jdkCompatibilityTest=true -Dtest_java_binary=${{ env.TEST_JAVA_BINARY }}
       - name: Store test results
         if: success() || failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-jdk-compatibility-${{ matrix.version }}-${{ matrix.distribution }}
+          path: |
+            **/junit-*.xml
+            **/TEST-*.xml
+
+  jboss:
+    name: JBoss integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+    # If no PR event or if a PR event that's caused by a non-fork and non dependabot actor
+    if: github.event_name != 'pull_request' || ( github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' )
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to the Elastic Container registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ secrets.ELASTIC_DOCKER_REGISTRY }}
+          username: ${{ secrets.ELASTIC_DOCKER_USERNAME }}
+          password: ${{ secrets.ELASTIC_DOCKER_PASSWORD }}
+
+      - uses: ./.github/workflows/unstash
+        with:
+          name: build
+          path: ${{ github.workspace }}
+      - name: Pull JBoss docker images
+        run: .ci/scripts/jboss-pull.sh
+      - uses: ./.github/workflows/maven-goal
+        with:
+          command: ./mvnw -q -P ci-jboss-integration-tests verify
+      - name: Store test results
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-jboss-integration
           path: |
             **/junit-*.xml
             **/TEST-*.xml

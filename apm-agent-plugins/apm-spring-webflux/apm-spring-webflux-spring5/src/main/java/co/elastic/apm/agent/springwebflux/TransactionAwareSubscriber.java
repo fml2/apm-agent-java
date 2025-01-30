@@ -20,7 +20,7 @@ package co.elastic.apm.agent.springwebflux;
 
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
-import co.elastic.apm.agent.tracer.ElasticContext;
+import co.elastic.apm.agent.tracer.TraceState;
 import co.elastic.apm.agent.tracer.GlobalTracer;
 import co.elastic.apm.agent.tracer.Transaction;
 import co.elastic.apm.agent.tracer.reference.ReferenceCountedMap;
@@ -72,7 +72,7 @@ class TransactionAwareSubscriber<T> implements CoreSubscriber<T>, Subscription {
 
         // store transaction into subscriber context it can be looked-up by reactor when the transaction
         // is not already active in current thread.
-        this.context = subscriber.currentContext().put(ElasticContext.class, transaction);
+        this.context = subscriber.currentContext().put(TraceState.class, transaction);
     }
 
     @Override
@@ -145,7 +145,7 @@ class TransactionAwareSubscriber<T> implements CoreSubscriber<T>, Subscription {
         Transaction<?> transaction = getTransaction();
         doEnter("onError", transaction);
         try {
-
+            WebfluxHelper.setFrameworkInfo(transaction);
             // We have to capture the transaction name just before it's actually ended to prevent
             // concurrency issues as the transaction is accessed from multiple threads when created by a servlet.
             WebfluxHelper.setTransactionName(transaction, exchange);
@@ -167,7 +167,7 @@ class TransactionAwareSubscriber<T> implements CoreSubscriber<T>, Subscription {
         Transaction<?> transaction = getTransaction();
         doEnter("onComplete", transaction);
         try {
-
+            WebfluxHelper.setFrameworkInfo(transaction);
             // We have to capture the transaction name just before it's actually ended to prevent
             // concurrency issues as the transaction is accessed from multiple threads when created by a servlet.
             WebfluxHelper.setTransactionName(transaction, exchange);
@@ -209,7 +209,7 @@ class TransactionAwareSubscriber<T> implements CoreSubscriber<T>, Subscription {
             if (transaction == null) {
                 return;
             }
-
+            WebfluxHelper.setFrameworkInfo(transaction);
             WebfluxHelper.setTransactionName(transaction, exchange);
             WebfluxHelper.endTransaction(null, transaction, exchange);
 

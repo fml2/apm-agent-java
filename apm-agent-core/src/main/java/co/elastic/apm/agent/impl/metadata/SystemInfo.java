@@ -20,7 +20,8 @@ package co.elastic.apm.agent.impl.metadata;
 
 
 import co.elastic.apm.agent.common.util.ProcessExecutionUtil;
-import co.elastic.apm.agent.configuration.ServerlessConfiguration;
+import co.elastic.apm.agent.configuration.CoreConfigurationImpl;
+import co.elastic.apm.agent.configuration.ServerlessConfigurationImpl;
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
 
@@ -65,7 +66,7 @@ public class SystemInfo {
     private final String architecture;
 
     /**
-     * Hostname configured manually through {@link co.elastic.apm.agent.configuration.CoreConfiguration#hostname}.
+     * Hostname configured manually through {@link CoreConfigurationImpl#hostname}.
      */
     @SuppressWarnings("JavadocReference")
     @Nullable
@@ -112,13 +113,13 @@ public class SystemInfo {
      * Creates a {@link SystemInfo} containing auto-discovered info about the system.
      * This method may block on reading files and executing external processes.
      *
-     * @param configuredHostname      hostname configured through the {@link co.elastic.apm.agent.configuration.CoreConfiguration#hostname} config
+     * @param configuredHostname      hostname configured through the {@link CoreConfigurationImpl#hostname} config
      * @param timeoutMillis           enables to limit the execution of the system discovery task
      * @param serverlessConfiguration serverless config
      * @return a future from which this system's info can be obtained
      */
     @SuppressWarnings("JavadocReference")
-    public static SystemInfo create(final @Nullable String configuredHostname, final long timeoutMillis, ServerlessConfiguration serverlessConfiguration) {
+    public static SystemInfo create(final @Nullable String configuredHostname, final long timeoutMillis, ServerlessConfigurationImpl serverlessConfiguration) {
         final String osName = System.getProperty("os.name");
         final String osArch = System.getProperty("os.arch");
 
@@ -138,7 +139,7 @@ public class SystemInfo {
         return systemInfo.findContainerDetails();
     }
 
-    static boolean isWindows(String osName) {
+    public static boolean isWindows(String osName) {
         return osName.startsWith("Windows");
     }
 
@@ -188,7 +189,10 @@ public class SystemInfo {
     static String discoverHostnameThroughCommand(boolean isWindows, long timeoutMillis) {
         String hostname;
         if (isWindows) {
-            hostname = executeHostnameDiscoveryCommand(Arrays.asList("powershell.exe", "[System.Net.Dns]::GetHostEntry($env:computerName).HostName"), timeoutMillis);
+            List<String> powershellCmd = Arrays.asList("powershell.exe",
+                "-NoLogo", "-NonInteractive", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-Command", "[System.Net.Dns]::GetHostEntry($env:computerName).HostName");
+            hostname = executeHostnameDiscoveryCommand(powershellCmd, timeoutMillis);
             if (hostname == null || hostname.isEmpty()) {
                 hostname = executeHostnameDiscoveryCommand(Arrays.asList("cmd.exe", "/c", "hostname"), timeoutMillis);
             }
@@ -456,7 +460,7 @@ public class SystemInfo {
     }
 
     /**
-     * The hostname manually configured through {@link co.elastic.apm.agent.configuration.CoreConfiguration#hostname}
+     * The hostname manually configured through {@link CoreConfigurationImpl#hostname}
      *
      * @return the manually configured hostname
      */

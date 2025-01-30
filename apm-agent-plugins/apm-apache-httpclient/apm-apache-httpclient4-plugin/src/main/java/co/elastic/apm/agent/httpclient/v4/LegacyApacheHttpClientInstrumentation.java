@@ -19,10 +19,13 @@
 package co.elastic.apm.agent.httpclient.v4;
 
 import co.elastic.apm.agent.httpclient.HttpClientHelper;
+import co.elastic.apm.agent.httpclient.common.RequestBodyCaptureRegistry;
+import co.elastic.apm.agent.httpclient.v4.helper.ApacheHttpClient4ApiAdapter;
 import co.elastic.apm.agent.httpclient.v4.helper.RequestHeaderAccessor;
-import co.elastic.apm.agent.tracer.ElasticContext;
 import co.elastic.apm.agent.tracer.Outcome;
 import co.elastic.apm.agent.tracer.Span;
+import co.elastic.apm.agent.tracer.TraceState;
+import co.elastic.apm.agent.tracer.configuration.CoreConfiguration;
 import net.bytebuddy.asm.Advice;
 import net.bytebuddy.description.NamedElement;
 import net.bytebuddy.description.method.MethodDescription;
@@ -79,7 +82,7 @@ public class LegacyApacheHttpClientInstrumentation extends BaseApacheHttpClientI
         @Advice.OnMethodEnter(suppress = Throwable.class, inline = false)
         public static Object onBeforeExecute(@Advice.Argument(0) @Nullable HttpHost host,
                                              @Advice.Argument(1) HttpRequest request) {
-            final ElasticContext<?> activeContext = tracer.currentContext();
+            final TraceState<?> activeContext = tracer.currentContext();
             Span<?> span = null;
             if (activeContext.getSpan() != null) {
                 String hostName = (host != null) ? host.getHostName() : null;
@@ -104,6 +107,7 @@ public class LegacyApacheHttpClientInstrumentation extends BaseApacheHttpClientI
                 }
             }
 
+            RequestBodyCaptureRegistry.potentiallyCaptureRequestBody(request, tracer.getActive(), ApacheHttpClient4ApiAdapter.get(), RequestHeaderAccessor.INSTANCE);
             tracer.currentContext().propagateContext(request, RequestHeaderAccessor.INSTANCE, RequestHeaderAccessor.INSTANCE);
             return span;
         }
@@ -123,10 +127,13 @@ public class LegacyApacheHttpClientInstrumentation extends BaseApacheHttpClientI
                 }
                 span.captureException(t);
             } finally {
-                // in case of circular redirect, we get an exception but status code won't be available without response
-                // thus we have to deal with span outcome directly
-                if (t instanceof CircularRedirectException) {
-                    span.withOutcome(Outcome.FAILURE);
+
+                if(t != null && !tracer.getConfig(CoreConfiguration.class).isAvoidTouchingExceptions()) {
+                    // in case of circular redirect, we get an exception but status code won't be available without response
+                    // thus we have to deal with span outcome directly
+                    if (t instanceof CircularRedirectException) {
+                        span.withOutcome(Outcome.FAILURE);
+                    }
                 }
 
                 span.deactivate().end();

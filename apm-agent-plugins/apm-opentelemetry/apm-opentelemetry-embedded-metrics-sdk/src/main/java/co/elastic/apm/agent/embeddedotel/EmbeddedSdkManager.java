@@ -18,11 +18,12 @@
  */
 package co.elastic.apm.agent.embeddedotel;
 
-import co.elastic.apm.agent.context.AbstractLifecycleListener;
 import co.elastic.apm.agent.embeddedotel.proxy.ProxyMeterProvider;
-import co.elastic.apm.agent.impl.ElasticApmTracer;
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
+import co.elastic.apm.agent.tracer.AbstractLifecycleListener;
+import co.elastic.apm.agent.tracer.Tracer;
+import io.opentelemetry.api.metrics.MeterProvider;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
 import io.opentelemetry.sdk.metrics.SdkMeterProviderBuilder;
 
@@ -40,14 +41,14 @@ public class EmbeddedSdkManager extends AbstractLifecycleListener {
     private static final Logger logger = LoggerFactory.getLogger(EmbeddedSdkManager.class);
 
     @Nullable
-    private ElasticApmTracer tracer;
+    private Tracer tracer;
     @Nullable
     private volatile SdkMeterProvider sdkInstance;
 
     private boolean isShutdown = false;
 
     @Override
-    public synchronized void start(ElasticApmTracer tracer) throws Exception {
+    public synchronized void start(Tracer tracer) throws Exception {
         this.tracer = tracer;
     }
 
@@ -65,6 +66,10 @@ public class EmbeddedSdkManager extends AbstractLifecycleListener {
         if (sdkInstance == null) {
             startSdk();
         }
+        if (sdkInstance == null) {
+            logger.warn("Returning NoOp-MeterProvider because OpenTelemetry metrics SDK could not be initialized!");
+            return new ProxyMeterProvider(MeterProvider.noop());
+        }
         return new ProxyMeterProvider(sdkInstance);
     }
 
@@ -78,7 +83,11 @@ public class EmbeddedSdkManager extends AbstractLifecycleListener {
     }
 
     private synchronized void startSdk() {
-        if (isShutdown || sdkInstance != null || tracer == null) {
+        if (isShutdown || sdkInstance != null) {
+            return;
+        }
+        if (tracer == null) {
+            logger.warn("Cannot initialize OpenTelemetry metrics SDK because tracer has not started yet");
             return;
         }
         logger.debug("Starting embedded OpenTelemetry metrics SDK");

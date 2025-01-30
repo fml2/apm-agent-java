@@ -19,8 +19,8 @@
 package co.elastic.apm.agent.scheduled;
 
 import co.elastic.apm.agent.AbstractInstrumentationTest;
-import co.elastic.apm.agent.impl.transaction.AbstractSpan;
-import co.elastic.apm.agent.impl.transaction.Transaction;
+import co.elastic.apm.agent.impl.transaction.AbstractSpanImpl;
+import co.elastic.apm.agent.impl.transaction.TransactionImpl;
 import org.junit.jupiter.api.Test;
 
 import java.util.Timer;
@@ -40,11 +40,11 @@ public class TimerTaskInstrumentationTest extends AbstractInstrumentationTest {
 
         assertThat(reporter.getTransactions()
             .stream()
-            .map(AbstractSpan::getNameAsString))
+            .map(AbstractSpanImpl::getNameAsString))
             .containsExactly("TestTimerTask#run", "TestTimerTask#run");
         assertThat(reporter.getTransactions()
             .stream()
-            .map(Transaction::getFrameworkName))
+            .map(TransactionImpl::getFrameworkName))
             .containsExactly("TimerTask", "TimerTask");
     }
 
@@ -57,7 +57,7 @@ public class TimerTaskInstrumentationTest extends AbstractInstrumentationTest {
 
         assertThat(reporter.getTransactions()
             .stream()
-            .map(AbstractSpan::getNameAsString))
+            .map(AbstractSpanImpl::getNameAsString))
             .containsExactly("TestTimerTask#run", "TestTimerTask#run");
     }
 
@@ -80,7 +80,7 @@ public class TimerTaskInstrumentationTest extends AbstractInstrumentationTest {
             }, 1);
 
         reporter.awaitTransactionCount(1);
-        assertThat(reporter.getTransactions().get(0).getNameAsString()).isEqualTo("1#run");
+        assertThat(reporter.getTransactions().get(0).getNameAsString()).isEqualTo("TimerTaskInstrumentationTest$1#run");
     }
 
     public static class TestTimerTask extends TimerTask {

@@ -19,8 +19,8 @@
 package co.elastic.apm.agent.awssdk.common;
 
 import co.elastic.apm.agent.AbstractInstrumentationTest;
-import co.elastic.apm.agent.impl.context.ServiceTarget;
-import co.elastic.apm.agent.impl.transaction.Span;
+import co.elastic.apm.agent.impl.context.ServiceTargetImpl;
+import co.elastic.apm.agent.impl.transaction.SpanImpl;
 import co.elastic.apm.agent.tracer.Outcome;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -40,7 +40,6 @@ import static org.assertj.core.api.Assertions.fail;
 
 @Testcontainers
 public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
-    private static final DockerImageName localstackImage = DockerImageName.parse("localstack/localstack:0.14.2");
     protected static final String BUCKET_NAME = "some-test-bucket";
     protected static final String SQS_QUEUE_NAME = "some-test-sqs-queue";
     protected static final String SQS_IGNORED_QUEUE_NAME = "ignored-queue";
@@ -52,7 +51,12 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
     protected static final String KEY_CONDITION_EXPRESSION = "attributeOne = :one";
 
     @Container
-    protected LocalStackContainer localstack = new LocalStackContainer(localstackImage).withServices(localstackService());
+    protected LocalStackContainer localstack;
+
+    public AbstractAwsClientIT(String localstackVersion) {
+        DockerImageName localstackImage = DockerImageName.parse("localstack/localstack:" + localstackVersion);
+        localstack = new LocalStackContainer(localstackImage).withServices(localstackService()).withEnv("SQS_ENDPOINT_STRATEGY", "dynamic");
+    }
 
     protected abstract String awsService();
 
@@ -82,7 +86,7 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
         private final Map<String, Object> otelAttributes;
 
         @Nullable
-        private Consumer<Span> spanAssertions;
+        private Consumer<SpanImpl> spanAssertions;
         private boolean asyncSpans;
 
         private TestBuilder(Supplier<?> test) {
@@ -115,7 +119,7 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
             return this;
         }
 
-        public TestBuilder withSpanAssertions(Consumer<Span> assertions) {
+        public TestBuilder withSpanAssertions(Consumer<SpanImpl> assertions) {
             this.spanAssertions = assertions;
             return this;
         }
@@ -123,7 +127,7 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
         public void execute() {
             doExecute();
 
-            Span span = getSpan();
+            SpanImpl span = getSpan();
             commonSpanAssertions(span);
 
             assertThat(span).hasOutcome(Outcome.SUCCESS);
@@ -133,7 +137,7 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
             assertThatExceptionOfType(exceptionType)
                 .isThrownBy(this::doExecute);
 
-            Span span = getSpan();
+            SpanImpl span = getSpan();
             commonSpanAssertions(span);
 
             assertThat(span).hasOutcome(Outcome.FAILURE);
@@ -153,10 +157,10 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
             }
         }
 
-        private Span getSpan() {
+        private SpanImpl getSpan() {
             String spanName = awsService() + " " + operationName + (entityName != null ? " " + entityName : "");
 
-            Span span = reporter.getSpanByName(spanName);
+            SpanImpl span = reporter.getSpanByName(spanName);
             assertThat(span)
                 .describedAs("span with name '%s' is expected", spanName)
                 .isNotNull();
@@ -164,7 +168,7 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
             return span;
         }
 
-        private void commonSpanAssertions(Span span) {
+        private void commonSpanAssertions(SpanImpl span) {
 
             assertThat(span)
                 .isExit()
@@ -175,7 +179,7 @@ public abstract class AbstractAwsClientIT extends AbstractInstrumentationTest {
                 assertThat(span).hasAction(action);
             }
 
-            ServiceTarget serviceTarget = span.getContext().getServiceTarget();
+            ServiceTargetImpl serviceTarget = span.getContext().getServiceTarget();
 
             String targetName = expectedTargetName(entityName);
 

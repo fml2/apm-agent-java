@@ -19,8 +19,8 @@
 package co.elastic.apm.agent.report;
 
 import co.elastic.apm.agent.common.util.Version;
-import co.elastic.apm.agent.configuration.CoreConfiguration;
-import co.elastic.apm.agent.configuration.ServerlessConfiguration;
+import co.elastic.apm.agent.configuration.CoreConfigurationImpl;
+import co.elastic.apm.agent.configuration.ServerlessConfigurationImpl;
 import co.elastic.apm.agent.report.ssl.SslUtils;
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
@@ -76,9 +76,9 @@ public class ApmServerClient {
     private static final Version VERSION_8_6 = Version.of("8.6.0");
     private static final Version VERSION_8_7_1 = Version.of("8.7.1");
 
-    private final ReporterConfiguration reporterConfiguration;
+    private final ReporterConfigurationImpl reporterConfiguration;
 
-    private final ServerlessConfiguration serverlessConfiguration;
+    private final ServerlessConfigurationImpl serverlessConfiguration;
     @Nullable
     private volatile List<URL> serverUrls;
     @Nullable
@@ -89,10 +89,10 @@ public class ApmServerClient {
     private final String userAgent;
 
     public ApmServerClient(ConfigurationRegistry configs) {
-        this.reporterConfiguration = configs.getConfig(ReporterConfiguration.class);
+        this.reporterConfiguration = configs.getConfig(ReporterConfigurationImpl.class);
         this.healthChecker = new ApmServerHealthChecker(this);
-        this.serverlessConfiguration = configs.getConfig(ServerlessConfiguration.class);
-        this.userAgent = getUserAgent(configs.getConfig(CoreConfiguration.class));
+        this.serverlessConfiguration = configs.getConfig(ServerlessConfigurationImpl.class);
+        this.userAgent = getUserAgent(configs.getConfig(CoreConfigurationImpl.class));
     }
 
     public void start() {
@@ -265,8 +265,10 @@ public class ApmServerClient {
         Exception previousException = null;
         for (URL serverUrl : prioritizedUrlList) {
             HttpURLConnection connection = null;
+            UrlConnectionUtils.ContextClassloaderScope clScope = null;
             try {
                 connection = startRequestToUrl(appendPath(serverUrl, path));
+                clScope = UrlConnectionUtils.withContextClassloaderOf(connection);
                 return connectionHandler.withConnection(connection);
             } catch (Exception e) {
                 expectedErrorCount = incrementAndGetErrorCount(expectedErrorCount);
@@ -277,6 +279,9 @@ public class ApmServerClient {
                 previousException = e;
             } finally {
                 HttpUtils.consumeAndClose(connection);
+                if (clScope != null) {
+                    clScope.close();
+                }
             }
         }
         if (previousException == null) {
@@ -290,13 +295,19 @@ public class ApmServerClient {
         List<T> results = new ArrayList<>(serverUrls.size());
         for (URL serverUrl : serverUrls) {
             HttpURLConnection connection = null;
+            UrlConnectionUtils.ContextClassloaderScope clScope = null;
             try {
                 connection = startRequestToUrl(appendPath(serverUrl, path));
+                clScope = UrlConnectionUtils.withContextClassloaderOf(connection);
                 results.add(connectionHandler.withConnection(connection));
             } catch (Exception e) {
                 logger.debug("Exception while interacting with APM Server", e);
             } finally {
                 HttpUtils.consumeAndClose(connection);
+                if (clScope != null) {
+                    clScope.close();
+                }
+
             }
         }
         return results;
@@ -418,7 +429,7 @@ public class ApmServerClient {
         T withConnection(HttpURLConnection connection) throws IOException;
     }
 
-    private static String getUserAgent(CoreConfiguration coreConfiguration) {
+    private static String getUserAgent(CoreConfigurationImpl coreConfiguration) {
         StringBuilder userAgent = new StringBuilder();
         userAgent.append("apm-agent-java/").append(VersionUtils.getAgentVersion());
         String serviceName = coreConfiguration.getServiceName();
@@ -436,6 +447,7 @@ public class ApmServerClient {
     /**
      * Escapes the provided string from characters that are disallowed within HTTP header comments.
      * See spec- https://httpwg.org/specs/rfc7230.html#field.components
+     *
      * @param headerFieldComment HTTP header comment value to be escaped
      * @return the escaped header comment
      */

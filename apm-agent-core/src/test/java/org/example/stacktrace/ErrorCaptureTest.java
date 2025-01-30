@@ -20,12 +20,13 @@ package org.example.stacktrace;
 
 import co.elastic.apm.agent.MockTracer;
 import co.elastic.apm.agent.common.util.WildcardMatcher;
-import co.elastic.apm.agent.configuration.CoreConfiguration;
+import co.elastic.apm.agent.configuration.CoreConfigurationImpl;
 import co.elastic.apm.agent.impl.ElasticApmTracer;
-import co.elastic.apm.agent.impl.context.Request;
-import co.elastic.apm.agent.impl.error.ErrorCapture;
-import co.elastic.apm.agent.impl.stacktrace.StacktraceConfiguration;
-import co.elastic.apm.agent.impl.transaction.Transaction;
+import co.elastic.apm.agent.impl.context.RequestImpl;
+import co.elastic.apm.agent.impl.error.ErrorCaptureImpl;
+import co.elastic.apm.agent.impl.error.RedactedException;
+import co.elastic.apm.agent.impl.stacktrace.StacktraceConfigurationImpl;
+import co.elastic.apm.agent.impl.transaction.TransactionImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -37,19 +38,19 @@ import static org.mockito.Mockito.doReturn;
 class ErrorCaptureTest {
 
     private ElasticApmTracer tracer;
-    private StacktraceConfiguration stacktraceConfiguration;
-    private CoreConfiguration coreConfiguration;
+    private StacktraceConfigurationImpl stacktraceConfiguration;
+    private CoreConfigurationImpl coreConfiguration;
 
     @BeforeEach
     void setUp() {
         tracer = MockTracer.createRealTracer();
-        stacktraceConfiguration = tracer.getConfig(StacktraceConfiguration.class);
-        coreConfiguration = tracer.getConfig(CoreConfiguration.class);
+        stacktraceConfiguration = tracer.getConfig(StacktraceConfigurationImpl.class);
+        coreConfiguration = tracer.getConfig(CoreConfigurationImpl.class);
     }
 
     @Test
     void testCulpritApplicationPackagesNotConfigured() {
-        final ErrorCapture errorCapture = new ErrorCapture(tracer);
+        final ErrorCaptureImpl errorCapture = new ErrorCaptureImpl(tracer);
         errorCapture.setException(new Exception());
         assertThat(errorCapture.getCulprit()).isEmpty();
     }
@@ -57,7 +58,7 @@ class ErrorCaptureTest {
     @Test
     void testCulprit() {
         doReturn(List.of("org.example.stacktrace")).when(stacktraceConfiguration).getApplicationPackages();
-        final ErrorCapture errorCapture = new ErrorCapture(tracer);
+        final ErrorCaptureImpl errorCapture = new ErrorCaptureImpl(tracer);
         final Exception nestedException = new Exception();
         final Exception topLevelException = new Exception(nestedException);
         errorCapture.setException(topLevelException);
@@ -68,7 +69,7 @@ class ErrorCaptureTest {
     @Test
     void testUnnestNestedException() {
         final NestedException nestedException = new NestedException(new CustomException());
-        ErrorCapture errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
+        ErrorCaptureImpl errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
         assertThat(errorCapture).isNotNull();
         assertThat(errorCapture.getException()).isNotInstanceOf(NestedException.class);
         assertThat(errorCapture.getException()).isInstanceOf(CustomException.class);
@@ -77,7 +78,7 @@ class ErrorCaptureTest {
     @Test
     void testUnnestDoublyNestedException() {
         final NestedException nestedException = new NestedException(new NestedException(new CustomException()));
-        ErrorCapture errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
+        ErrorCaptureImpl errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
         assertThat(errorCapture).isNotNull();
         assertThat(errorCapture.getException()).isNotInstanceOf(NestedException.class);
         assertThat(errorCapture.getException()).isInstanceOf(CustomException.class);
@@ -87,14 +88,14 @@ class ErrorCaptureTest {
     void testIgnoredNestedException() {
         doReturn(List.of(WildcardMatcher.valueOf("*CustomException"))).when(coreConfiguration).getIgnoreExceptions();
         final NestedException nestedException = new NestedException(new CustomException());
-        ErrorCapture errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
+        ErrorCaptureImpl errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
         assertThat(errorCapture).isNull();
     }
 
     @Test
     void testNonConfiguredNestingException() {
         final WrapperException wrapperException = new WrapperException(new CustomException());
-        ErrorCapture errorCapture = tracer.captureException(wrapperException, tracer.currentContext(), null);
+        ErrorCaptureImpl errorCapture = tracer.captureException(wrapperException, tracer.currentContext(), null);
         assertThat(errorCapture).isNotNull();
         assertThat(errorCapture.getException()).isInstanceOf(WrapperException.class);
     }
@@ -102,10 +103,32 @@ class ErrorCaptureTest {
     @Test
     void testNonConfiguredWrappingConfigured() {
         final NestedException nestedException = new NestedException(new WrapperException(new NestedException(new Exception())));
-        ErrorCapture errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
+        ErrorCaptureImpl errorCapture = tracer.captureException(nestedException, tracer.currentContext(), null);
         assertThat(errorCapture).isNotNull();
         assertThat(errorCapture.getException()).isInstanceOf(WrapperException.class);
     }
+
+    @Test
+    void testExceptionRedaction() {
+        doReturn(true).when(coreConfiguration).isRedactExceptions();
+        assertThat(tracer.redactExceptionIfRequired(null)).isNull();
+
+        Exception exception = new CustomException();
+        Throwable redacted = tracer.redactExceptionIfRequired(exception);
+        assertThat(redacted).isInstanceOf(RedactedException.class);
+
+        // double redaction means no instanceof check
+        assertThat(tracer.redactExceptionIfRequired(redacted)).isNotSameAs(redacted);
+
+        ErrorCaptureImpl errorCapture = tracer.captureException(exception, tracer.currentContext(), null);
+        assertThat(errorCapture).isNotNull();
+        assertThat(errorCapture.getException()).isInstanceOf(RedactedException.class);
+
+        ErrorCaptureImpl alreadyRedacted = tracer.captureException(redacted, tracer.currentContext(), null);
+        assertThat(alreadyRedacted).isNotNull();
+        assertThat(alreadyRedacted.getException()).isNotSameAs(redacted);
+    }
+
 
     private static class NestedException extends Exception {
         public NestedException(Throwable cause) {
@@ -123,14 +146,14 @@ class ErrorCaptureTest {
 
     @Test
     void testTransactionContextTransfer() {
-        final Transaction transaction = new Transaction(tracer);
-        Request transactionRequest = transaction.getContext().getRequest()
+        final TransactionImpl transaction = new TransactionImpl(tracer);
+        RequestImpl transactionRequest = transaction.getContext().getRequest()
             .withMethod("GET")
             .addHeader("key", "value");
         transactionRequest.withBodyBuffer().append("TEST");
         transactionRequest.endOfBufferInput();
-        final ErrorCapture errorCapture = new ErrorCapture(tracer).asChildOf(transaction);
-        Request errorRequest = errorCapture.getContext().getRequest();
+        final ErrorCaptureImpl errorCapture = new ErrorCaptureImpl(tracer).asChildOf(transaction);
+        RequestImpl errorRequest = errorCapture.getContext().getRequest();
         assertThat(errorRequest.getMethod()).isEqualTo("GET");
         assertThat(errorRequest.getHeaders().get("key")).isEqualTo("value");
         assertThat(errorRequest.getBodyBufferForSerialization()).isNotNull();
@@ -139,13 +162,13 @@ class ErrorCaptureTest {
 
     @Test
     void testTransactionContextTransferNonFinishedBody() {
-        final Transaction transaction = new Transaction(tracer);
-        Request transactionRequest = transaction.getContext().getRequest()
+        final TransactionImpl transaction = new TransactionImpl(tracer);
+        RequestImpl transactionRequest = transaction.getContext().getRequest()
             .withMethod("GET")
             .addHeader("key", "value");
         transactionRequest.withBodyBuffer().append("TEST");
-        final ErrorCapture errorCapture = new ErrorCapture(tracer).asChildOf(transaction);
-        Request errorRequest = errorCapture.getContext().getRequest();
+        final ErrorCaptureImpl errorCapture = new ErrorCaptureImpl(tracer).asChildOf(transaction);
+        RequestImpl errorRequest = errorCapture.getContext().getRequest();
         assertThat(errorRequest.getMethod()).isEqualTo("GET");
         assertThat(errorRequest.getHeaders().get("key")).isEqualTo("value");
         assertThat(errorRequest.getBodyBufferForSerialization())
@@ -155,11 +178,11 @@ class ErrorCaptureTest {
 
     @Test
     void testActiveError() {
-        assertThat(ErrorCapture.getActive()).isNull();
-        ErrorCapture errorCapture = new ErrorCapture(tracer).activate();
-        assertThat(ErrorCapture.getActive()).isNotNull();
+        assertThat(ErrorCaptureImpl.getActive()).isNull();
+        ErrorCaptureImpl errorCapture = new ErrorCaptureImpl(tracer).activate();
+        assertThat(ErrorCaptureImpl.getActive()).isNotNull();
         errorCapture.deactivate().end();
-        assertThat(ErrorCapture.getActive()).isNull();
+        assertThat(ErrorCaptureImpl.getActive()).isNull();
     }
 
 

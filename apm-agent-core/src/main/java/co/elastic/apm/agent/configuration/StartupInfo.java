@@ -18,10 +18,11 @@
  */
 package co.elastic.apm.agent.configuration;
 
+import co.elastic.apm.agent.tracer.Tracer;
 import co.elastic.apm.agent.tracer.configuration.TimeDuration;
-import co.elastic.apm.agent.context.AbstractLifecycleListener;
+import co.elastic.apm.agent.tracer.AbstractLifecycleListener;
 import co.elastic.apm.agent.impl.ElasticApmTracer;
-import co.elastic.apm.agent.impl.stacktrace.StacktraceConfiguration;
+import co.elastic.apm.agent.impl.stacktrace.StacktraceConfigurationImpl;
 import co.elastic.apm.agent.util.VersionUtils;
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
@@ -56,14 +57,14 @@ public class StartupInfo extends AbstractLifecycleListener {
     }
 
     @Override
-    public void init(ElasticApmTracer tracer) {
-        ConfigurationRegistry configurationRegistry = tracer.getConfigurationRegistry();
+    public void init(Tracer tracer) {
+        ConfigurationRegistry configurationRegistry = tracer.require(ElasticApmTracer.class).getConfigurationRegistry();
         logConfiguration(configurationRegistry, logger);
     }
 
     void logConfiguration(ConfigurationRegistry configurationRegistry, Logger logger) {
-        final String serviceName = configurationRegistry.getConfig(CoreConfiguration.class).getServiceName();
-        final String serviceVersion = configurationRegistry.getConfig(CoreConfiguration.class).getServiceVersion();
+        final String serviceName = configurationRegistry.getConfig(CoreConfigurationImpl.class).getServiceName();
+        final String serviceVersion = configurationRegistry.getConfig(CoreConfigurationImpl.class).getServiceVersion();
 
         StringBuilder serviceNameAndVersion = new StringBuilder(serviceName);
         if (serviceVersion != null) {
@@ -86,9 +87,9 @@ public class StartupInfo extends AbstractLifecycleListener {
                 }
             }
         }
-        if (configurationRegistry.getConfig(StacktraceConfiguration.class).getApplicationPackages().isEmpty()) {
+        if (configurationRegistry.getConfig(StacktraceConfigurationImpl.class).getApplicationPackages().isEmpty()) {
             logger.warn("To enable all features and decrease startup time, please configure {}",
-                StacktraceConfiguration.APPLICATION_PACKAGES);
+                StacktraceConfigurationImpl.APPLICATION_PACKAGES);
         }
     }
 

@@ -18,14 +18,15 @@
  */
 package co.elastic.apm.agent.report.serialize;
 
+import co.elastic.apm.agent.report.ReporterConfigurationImpl;
+import co.elastic.apm.agent.tracer.Tracer;
 import co.elastic.apm.agent.tracer.service.ServiceInfo;
-import co.elastic.apm.agent.context.AbstractLifecycleListener;
+import co.elastic.apm.agent.tracer.AbstractLifecycleListener;
 import co.elastic.apm.agent.impl.ElasticApmTracer;
-import co.elastic.apm.agent.metrics.Labels;
+import co.elastic.apm.agent.tracer.metrics.Labels;
 import co.elastic.apm.agent.metrics.MetricRegistry;
 import co.elastic.apm.agent.metrics.MetricSet;
 import co.elastic.apm.agent.report.Reporter;
-import co.elastic.apm.agent.report.ReporterConfiguration;
 import com.dslplatform.json.JsonWriter;
 
 import java.util.List;
@@ -47,10 +48,12 @@ public class MetricRegistryReporter extends AbstractLifecycleListener implements
     }
 
     @Override
-    public void start(ElasticApmTracer tracer) {
-        long intervalMs = tracer.getConfig(ReporterConfiguration.class).getMetricsIntervalMs();
+    public void start(Tracer tracer) {
+        long intervalMs = tracer.getConfig(ReporterConfigurationImpl.class).getMetricsIntervalMs();
         if (intervalMs > 0) {
-            tracer.getSharedSingleThreadedPool().scheduleAtFixedRate(this, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+            tracer.require(ElasticApmTracer.class)
+                .getSharedSingleThreadedPool()
+                .scheduleAtFixedRate(this, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
         }
     }
 

@@ -19,12 +19,18 @@
 package co.elastic.apm.agent.tracer;
 
 import co.elastic.apm.agent.tracer.dispatch.HeaderGetter;
+import co.elastic.apm.agent.tracer.metrics.DoubleSupplier;
+import co.elastic.apm.agent.tracer.metrics.Labels;
 import co.elastic.apm.agent.tracer.pooling.ObjectPoolFactory;
 import co.elastic.apm.agent.tracer.reference.ReferenceCounted;
 import co.elastic.apm.agent.tracer.reference.ReferenceCountedMap;
+import co.elastic.apm.agent.tracer.service.Service;
+import co.elastic.apm.agent.tracer.service.ServiceInfo;
+import com.dslplatform.json.JsonWriter;
 
 import javax.annotation.Nullable;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class GlobalTracer implements Tracer {
 
@@ -94,7 +100,7 @@ public class GlobalTracer implements Tracer {
     }
 
     @Override
-    public ElasticContext<?> currentContext() {
+    public TraceState<?> currentContext() {
         return tracer.currentContext();
     }
 
@@ -124,13 +130,91 @@ public class GlobalTracer implements Tracer {
 
     @Nullable
     @Override
-    public <T, C> Transaction<?> startChildTransaction(@Nullable C headerCarrier, HeaderGetter<T, C> textHeadersGetter, @Nullable ClassLoader initiatingClassLoader) {
-        return tracer.startChildTransaction(headerCarrier, textHeadersGetter, initiatingClassLoader);
+    public <T, C> Transaction<?> startChildTransaction(@Nullable C headerCarrier, HeaderGetter<T, C> headerGetter, @Nullable ClassLoader initiatingClassLoader) {
+        return tracer.startChildTransaction(headerCarrier, headerGetter, initiatingClassLoader);
     }
 
     @Nullable
     @Override
     public ErrorCapture captureException(@Nullable Throwable e, @Nullable ClassLoader initiatingClassLoader) {
         return tracer.captureException(e, initiatingClassLoader);
+    }
+
+    @Override
+    public void reportLog(String log) {
+        tracer.reportLog(log);
+    }
+
+    @Override
+    public void reportLog(byte[] log) {
+        tracer.reportLog(log);
+    }
+
+    @Nullable
+    @Override
+    public Service createService(String ephemeralId) {
+        return tracer.createService(ephemeralId);
+    }
+
+    @Nullable
+    @Override
+    public Throwable redactExceptionIfRequired(@Nullable Throwable original) {
+        return tracer.redactExceptionIfRequired(original);
+    }
+
+    @Override
+    public void flush() {
+        tracer.flush();
+    }
+
+    @Override
+    public void completeMetaData(String name, String version, String id, String region) {
+        tracer.completeMetaData(name, version, id, region);
+    }
+
+    @Override
+    public void removeGauge(String name, Labels.Immutable labels) {
+        tracer.removeGauge(name, labels);
+    }
+
+    @Override
+    public void addGauge(String name, Labels.Immutable labels, DoubleSupplier supplier) {
+        tracer.addGauge(name, labels, supplier);
+    }
+
+    @Override
+    public void submit(Runnable job) {
+        tracer.submit(job);
+    }
+
+    @Override
+    public void schedule(Runnable job, long interval, TimeUnit timeUnit) {
+        tracer.schedule(job, interval, timeUnit);
+    }
+
+    @Override
+    public void addShutdownHook(AutoCloseable hook) {
+        tracer.addShutdownHook(hook);
+    }
+
+    @Override
+    public void reportMetric(JsonWriter metrics) {
+        tracer.reportMetric(metrics);
+    }
+
+    @Nullable
+    @Override
+    public ServiceInfo getServiceInfoForClassLoader(@Nullable ClassLoader initiatingClassLoader) {
+        return tracer.getServiceInfoForClassLoader(initiatingClassLoader);
+    }
+
+    @Override
+    public void setServiceInfoForClassLoader(@Nullable ClassLoader classLoader, ServiceInfo serviceInfo) {
+        tracer.setServiceInfoForClassLoader(classLoader, serviceInfo);
+    }
+
+    @Override
+    public ServiceInfo autoDetectedServiceInfo() {
+        return tracer.autoDetectedServiceInfo();
     }
 }
