@@ -21,12 +21,13 @@ package co.elastic.apm.agent.grpc;
 import co.elastic.apm.agent.sdk.weakconcurrent.WeakConcurrent;
 import co.elastic.apm.agent.sdk.weakconcurrent.WeakMap;
 import co.elastic.apm.agent.tracer.AbstractSpan;
-import co.elastic.apm.agent.tracer.ElasticContext;
+import co.elastic.apm.agent.tracer.TraceState;
 import co.elastic.apm.agent.tracer.GlobalTracer;
 import co.elastic.apm.agent.tracer.Outcome;
 import co.elastic.apm.agent.tracer.Span;
 import co.elastic.apm.agent.tracer.Tracer;
 import co.elastic.apm.agent.tracer.Transaction;
+import co.elastic.apm.agent.tracer.configuration.CoreConfiguration;
 import co.elastic.apm.agent.tracer.dispatch.AbstractHeaderGetter;
 import co.elastic.apm.agent.tracer.dispatch.TextHeaderGetter;
 import co.elastic.apm.agent.tracer.dispatch.TextHeaderSetter;
@@ -257,7 +258,11 @@ public class GrpcHelper {
         if (null != thrown) {
             // when there is a runtime exception thrown in one of the listener methods the calling code will catch it
             // and make this the last listener method called
-            terminateStatus = Status.fromThrowable(thrown);
+            if (tracer.getConfig(CoreConfiguration.class).isAvoidTouchingExceptions()) {
+                terminateStatus = Status.UNKNOWN;
+            } else {
+                terminateStatus = Status.fromThrowable(thrown);
+            }
             setTerminateStatus = true;
 
         } else if (transaction.getOutcome() == Outcome.UNKNOWN) {
@@ -291,7 +296,7 @@ public class GrpcHelper {
      * @return client call span (activated) or {@literal null} if not within an exit span.
      */
     @Nullable
-    public Span<?> onClientCallCreationEntry(ElasticContext<?> parent,
+    public Span<?> onClientCallCreationEntry(TraceState<?> parent,
                                              @Nullable MethodDescriptor<?, ?> method,
                                              @Nullable String authority) {
 
@@ -328,7 +333,7 @@ public class GrpcHelper {
      * This is the 2nd method called during client call execution, the next is {@link #clientCallStartEnter(ClientCall, ClientCall.Listener, Metadata)}.
      *
      * @param clientCall    client call
-     * @param spanFromEntry span created at {@link #onClientCallCreationEntry(ElasticContext, MethodDescriptor, String)}
+     * @param spanFromEntry span created at {@link #onClientCallCreationEntry(TraceState, MethodDescriptor, String)}
      */
     public void onClientCallCreationExit(@Nullable ClientCall<?, ?> clientCall, @Nullable Span<?> spanFromEntry) {
         if (clientCall != null) {

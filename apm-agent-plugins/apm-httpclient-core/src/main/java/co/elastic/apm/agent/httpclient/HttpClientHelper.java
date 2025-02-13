@@ -18,15 +18,26 @@
  */
 package co.elastic.apm.agent.httpclient;
 
+import co.elastic.apm.agent.common.util.WildcardMatcher;
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
-import co.elastic.apm.agent.tracer.ElasticContext;
+import co.elastic.apm.agent.tracer.AbstractSpan;
+import co.elastic.apm.agent.tracer.GlobalTracer;
 import co.elastic.apm.agent.tracer.Span;
+import co.elastic.apm.agent.tracer.TraceState;
+import co.elastic.apm.agent.tracer.configuration.WebConfiguration;
+import co.elastic.apm.agent.tracer.dispatch.TextHeaderGetter;
+import co.elastic.apm.agent.tracer.metadata.BodyCapture;
 
 import javax.annotation.Nullable;
 import java.net.URI;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class HttpClientHelper {
+
+    private static final Pattern CHARSET_EXTRACTOR = Pattern.compile(";\\s*charset\\s*=\\s*((\"[^\"]+)|([^;\\s]+))");
 
     private static final Logger logger = LoggerFactory.getLogger(HttpClientHelper.class);
 
@@ -34,7 +45,7 @@ public class HttpClientHelper {
     public static final String HTTP_SUBTYPE = "http";
 
     @Nullable
-    public static Span<?> startHttpClientSpan(ElasticContext<?> activeContext, String method, @Nullable URI uri, @Nullable CharSequence hostName) {
+    public static Span<?> startHttpClientSpan(TraceState<?> activeContext, String method, @Nullable URI uri, @Nullable CharSequence hostName) {
         String uriString = null;
         String scheme = null;
         int port = -1;
@@ -50,16 +61,69 @@ public class HttpClientHelper {
     }
 
     @Nullable
-    public static Span<?> startHttpClientSpan(ElasticContext<?> activeContext, String method, @Nullable String uri,
+    public static Span<?> startHttpClientSpan(TraceState<?> activeContext, String method, @Nullable String uri,
                                               @Nullable String scheme, @Nullable CharSequence hostName, int port) {
         Span<?> span = activeContext.createExitSpan();
         if (span != null) {
+            if (span.isSampled()) {
+                span.getContext().getHttp().getRequestBody().markEligibleForCapturing();
+            }
             updateHttpSpanNameAndContext(span, method, uri, scheme, hostName, port);
         }
         if (logger.isTraceEnabled()) {
             logger.trace("Created an HTTP exit span: {} for URI: {}. Parent span: {}", span, uri, activeContext);
         }
         return span;
+    }
+
+    public static <R> void checkBodyCapturePreconditions(@Nullable AbstractSpan<?> abstractSpan, R request, TextHeaderGetter<R> headerGetter) {
+        if (!(abstractSpan instanceof Span<?>)) {
+            return;
+        }
+        Span<?> span = (Span<?>) abstractSpan;
+        BodyCapture bodyCapture = span.getContext().getHttp().getRequestBody();
+        if (!bodyCapture.isEligibleForCapturing()) {
+            return;
+        }
+        if (bodyCapture.havePreconditionsBeenChecked()) {
+            return;
+        }
+        WebConfiguration webConfig = GlobalTracer.get().getConfig(WebConfiguration.class);
+        int byteCount = webConfig.getCaptureClientRequestBytes();
+        if (byteCount == 0) {
+            bodyCapture.markPreconditionsFailed();
+            return;
+        }
+        List<WildcardMatcher> contentTypes = webConfig.getCaptureContentTypes();
+        String contentTypeHeader = headerGetter.getFirstHeader("Content-Type", request);
+        if (contentTypeHeader == null) {
+            contentTypeHeader = "";
+        }
+        if (WildcardMatcher.anyMatch(contentTypes, contentTypeHeader) == null) {
+            bodyCapture.markPreconditionsFailed();
+            return;
+        }
+        bodyCapture.markPreconditionsPassed(extractCharsetFromContentType(contentTypeHeader), byteCount);
+    }
+
+    public static <R> boolean checkAndStartRequestBodyCapture(@Nullable AbstractSpan<?> abstractSpan, R request, TextHeaderGetter<R> headerGetter) {
+        if (!(abstractSpan instanceof Span<?>)) {
+            return false;
+        }
+        checkBodyCapturePreconditions(abstractSpan, request, headerGetter);
+        Span<?> span = (Span<?>) abstractSpan;
+        return span.getContext().getHttp().getRequestBody().startCapture();
+    }
+
+    //Visible for testing
+    @Nullable
+    static String extractCharsetFromContentType(String contentTypeHeader) {
+        Matcher matcher = CHARSET_EXTRACTOR.matcher(contentTypeHeader);
+        if (matcher.find()) {
+            String potentiallyQuotedCharset = matcher.group(1);
+            return potentiallyQuotedCharset.replace("\"", "");
+        }
+        return null;
     }
 
     public static void updateHttpSpanNameAndContext(Span<?> span, String method, @Nullable String uri, String scheme, CharSequence hostName, int port) {

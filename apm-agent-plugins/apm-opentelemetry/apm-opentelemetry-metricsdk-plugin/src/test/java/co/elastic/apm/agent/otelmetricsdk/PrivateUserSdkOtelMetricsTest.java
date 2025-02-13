@@ -18,8 +18,9 @@
  */
 package co.elastic.apm.agent.otelmetricsdk;
 
-import co.elastic.apm.agent.configuration.MetricsConfiguration;
+import co.elastic.apm.agent.configuration.MetricsConfigurationImpl;
 import io.opentelemetry.api.metrics.DoubleHistogram;
+import io.opentelemetry.api.metrics.DoubleHistogramBuilder;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.metrics.MeterProvider;
 import io.opentelemetry.sdk.metrics.Aggregation;
@@ -95,6 +96,23 @@ public class PrivateUserSdkOtelMetricsTest extends AbstractOtelMetricsTest {
         ((SdkMeterProvider) getMeterProvider()).forceFlush();
     }
 
+
+    @Test
+    @Override
+    public void testDefaultHistogramBuckets() {
+        // Unfortunately default histogram buckets don't work with user-provided SDKs of version 1.32.0 or newer
+        // The reason is that a default aggregation provided by the exporter would override
+        // bucket boundaries set via DoubleHistogramBuilder.setExplicitBucketBoundaries
+        // We decided to instead respect the bucket boundaries provided by the API
+        try {
+            DoubleHistogramBuilder.class.getMethod("setExplicitBucketBoundariesAdvice", List.class);
+            //Method exists, default bucket boundaries are not supported
+            //Don't execute test for that reason
+        } catch (NoSuchMethodException e) {
+            super.testDefaultHistogramBuckets();
+        }
+    }
+
     @Test
     public void testCustomHistogramView() {
         sdkCustomizer = builder -> builder.registerView(
@@ -102,7 +120,7 @@ public class PrivateUserSdkOtelMetricsTest extends AbstractOtelMetricsTest {
             View.builder().setAggregation(Aggregation.explicitBucketHistogram(List.of(1.0, 5.0))).build()
         );
 
-        MetricsConfiguration metricsConfig = config.getConfig(MetricsConfiguration.class);
+        MetricsConfigurationImpl metricsConfig = config.getConfig(MetricsConfigurationImpl.class);
         doReturn(List.of(42.0)).when(metricsConfig).getCustomMetricsHistogramBoundaries();
 
         Meter testMeter = createMeter("test");

@@ -32,13 +32,157 @@ Use subheadings with the "=====" level for adding notes for unreleased changes:
 === Unreleased
 
 [float]
+===== Bug fixes
+* Prevent NPE in OpenTelemetry metrics bridge in case of asynchronous agent start - {pull}3880[#3880]
+* Fix random Weblogic ClassNotFoundException related to thread context classloader - {pull}3870[#3870]
+* Skips using NOFOLLOW_LINKS file open option when running on OS/400 as it's unsupported there - {pull}3905[#3905]
+* Add framework name and version for Spring Webflux transactions - {pull}3936[#3936]
+
+[[release-notes-1.x]]
+=== Java Agent version 1.x
+
+[[release-notes-1.52.1]]
+==== 1.52.1 - 2024/11/18
+
+[float]
+===== Bug fixes
+* Fix JMX metric warning message about unsupported composite value types - {pull}3849[#3849]
+* Fix JAX-WS transaction naming for @WebMethod annotated methods - {pull}3850[#3850]
+
+[[release-notes-1.52.0]]
+==== 1.52.0 - 2024/09/23
+
+[float]
+===== Bug fixes
+* Fix log4j2 log correlation with shaded application jar - {pull}3764[#3764]
+* Improve automatic span class name detection for Scala and nested/anonymous classes - {pull}3746[#3746]
+
+[float]
+===== Features
+* Added experimental option to capture HTTP client request bodies for Apache Http Client v4 and v5, HttpUrlConnection and Spring WebClient - {pull}3776[#3776], {pull}3962[#3962], {pull}3724[#3724], {pull}3754[#3754], {pull}3767[#3767]
+* Agent health metrics now GA - {pull}3802[#3802]
+
+[[release-notes-1.51.0]]
+==== 1.51.0 - 2024/07/24
+
+[float]
+===== Bug fixes
+* Restore compatibility with Java 7 - {pull}3657[#3657]
+* Avoid `ClassCastException` and issue warning when trying to use otel span links - {pull}3672[#3672]
+* Avoid `NullPointerException` with runtime attach API and invalid map entries - {pull}3712[#3712]
+* Enhance invalid state JMX metrics handling - {pull}3713[#3713]
+* Skips using NOFOLLOW_LINKS file open option when running on z/OS as it's unsupported there - {pull}3722[#3722]
+
+[float]
+===== Features
+* Added option to make routing-key part of RabbitMQ transaction/span names - {pull}3636[#3636]
+* Added internal option for capturing request bodies for apache httpclient v4 - {pull}3692[#3692]
+* Added automatic module name to apm-agent-attach - {pull}3743[#3743]
+
+[[release-notes-1.50.0]]
+==== 1.50.0 - 2024/05/28
+
+[float]
+===== Features
+* Added support for correlating APM data with elastic universal profiling data - {pull}3615[#3615], {pull}3602[#3602], {pull}3607[#3607], {pull}3598[#3598]
+* Excluded latest AppDynamics packages from instrumentation (`com.cisco.mtagent.*`) - {pull}3632[#3632]
+
+[float]
+===== Bug fixes
+* Fixed edge case where inferred spans could cause cycles in the trace parent-child relationships, subsequently resulting in the UI crashing - {pull}3588[#3588]
+* Fix NPE in dropped spans statistics - {pull}3590[#3590]
+* Fix too small activation stack size for small `transaction_max_spans` values - {pull}3643[#3643]
+
+[[release-notes-1.49.0]]
+==== 1.49.0 - 2024/04/02
+
+[float]
+===== Bug fixes
+* Fixed problems with public API annotation inheritance - {pull}3551[#3551]
+
+[float]
+===== Features
+* Differentiate Lambda URLs from API Gateway in AWS Lambda integration - {pull}3417[#3417]
+* Added lambda support for ELB triggers {pull}#3411[#3411]
+* Add exclusion list option for calling DatabaseMetaData.getUserName - {pull}#3568[#3568]
+
+[[release-notes-1.48.1]]
+==== 1.48.1 - 2024/03/06
+
+[float]
+===== Bug fixes
+* Avoid another case where we might touch application exceptions for `safe_exceptions` - {pull}3553[#3553]
+* More robust hostname detection on Windows - {pull}3556[#3556]
+
+[[release-notes-1.48.0]]
+==== 1.48.0 - 2024/03/05
+
+[float]
+===== Features
+* Bumped base alpine docker image version - {pull}3524[#3524]
+* Replace statement parser cache with an LRU cache to improve efficiency in certain cases {pull}3492[#3492]
+
+[float]
+===== Bug fixes
+* Added missing support for TracerBuilder in OpenTelemetry bridge - {pull}3535[#3535]
+* Fixed some locations to not touch exceptions when `safe_exception` is configured - {pull}3543[#3543]
+
+[float]
+===== Potentially breaking changes
+* The minimum supported OpenTelemetry version has been increased to 1.4.0 - {pull}3535[#3535]
+
+[[release-notes-1.47.1]]
+==== 1.47.1 - 2024/02/15
+
+[float]
+===== Features
+* Added internal `safe_exceptions` config option to workaround JVM bugs related to touching exceptions - {pull}3528[#3528]
+
+[float]
+===== Bug fixes
+* Cleanup extra servlet request attribute used for Spring exception handler - {pull}3527[#3527]
+
+[[release-notes-1.47.0]]
+==== 1.47.0 - 2024/02/13
+
+[float]
+===== Features
+* Added a configuration option to use queues in names of spring-rabbit transactions - {pull}3424[#3424]
+* Add option to retry JMX metrics capture in case of exception - {pull}3511[#3511]
+
+[float]
+===== Bug fixes
+* Add support to CLI attach download for new agent signature for 1.46.0+ - {pull}3513[#3513]
+
+[[release-notes-1.46.0]]
+==== 1.46.0 - 2024/01/29
+
+[float]
+===== Features
+* Added support for OpenTelementry Attributes db.statement and db.user - {pull}3475[#3475]
+
+[float]
+===== Bug fixes
+* Fixed NPE in ApacheHttpClientApiAdapter#getHostName - {pull}3479[#3479]
+* Fix span stack trace when combined with span compression - {pull}3474[#3474]
+* Fix `UnsupportedClassVersionError` java 7 compatibility for jctools - {pull}3483[#3483]
+
+[[release-notes-1.45.0]]
+==== 1.45.0 - 2023/12/07
+
+[float]
 ===== Features
 * Added support for OpenTelemetry annotations - `WithSpan` and `SpanAttribute` - {pull}3406[#3406]
 * Only automatically apply redacted exceptions for Corretto JVM 17-20. Outside that, user should use capture_exception_details=false to workaround the JVM race-condition bug if it gets triggered: {pull}3438[#3438]
 * Added support for Spring 6.1 / Spring-Boot 3.2 - {pull}3440[#3440]
+* Add support for Apache HTTP client 5.x - {pull}3419[#3419]
 
-[[release-notes-1.x]]
-=== Java Agent version 1.x
+[float]
+===== Potentially breaking changes
+* Added support for OpenTelemetry `1.32.0`. As a result, `custom_metrics_histogram_boundaries` will not
+work when you bring your own `MeterProvider` from an SDK with version `1.32.0` or newer. As a workaround,
+you should manually register a corresponding View in your `MeterProvider`. Note that this change will not
+affect you, if you are using the OpenTelemetry API only and not the SDK. - {pull}3447[#3447]
 
 [[release-notes-1.44.0]]
 ==== 1.44.0 - 2023/11/21
@@ -47,7 +191,7 @@ Use subheadings with the "=====" level for adding notes for unreleased changes:
 ===== Features
 * Added protection against invalid timestamps provided by manual instrumentation - {pull}3363[#3363]
 * Added support for AWS SDK 2.21 - {pull}3373[#3373]
-* Capture bucket and object key to Lambda transaction as OTel attributes - `aws.s3.bueckt`, `aws.s3.key` - {pull}3364[#3364]
+* Capture bucket and object key to Lambda transaction as OTel attributes - `aws.s3.bucket`, `aws.s3.key` - {pull}3364[#3364]
 * Added `context_propagation_only` configuration option - {pull}3358[#3358]
 * Added attribute[*] for JMX pattern metrics (all metrics can now be generated with `object_name[*:type=*,name=*] attribute[*]`) - {pull}3376[#3376]
 

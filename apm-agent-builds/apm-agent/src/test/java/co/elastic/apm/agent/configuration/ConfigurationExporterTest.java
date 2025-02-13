@@ -21,7 +21,6 @@ package co.elastic.apm.agent.configuration;
 import co.elastic.apm.agent.MockTracer;
 import co.elastic.apm.agent.impl.ElasticApmTracer;
 import co.elastic.apm.agent.tracer.GlobalTracer;
-import co.elastic.apm.agent.impl.Tracer;
 import co.elastic.apm.agent.sdk.ElasticApmInstrumentation;
 import co.elastic.apm.agent.util.DependencyInjectingServiceLoader;
 import freemarker.template.Configuration;
@@ -89,7 +88,7 @@ class ConfigurationExporterTest {
         renderedDocumentationPath = Paths.get("../../docs/configuration.asciidoc");
         ElasticApmTracer tracer = mock(ElasticApmTracer.class);
         doReturn(tracer).when(tracer).require(ElasticApmTracer.class);
-        doReturn(Tracer.TracerState.UNINITIALIZED).when(tracer).getState();
+        doReturn(ElasticApmTracer.TracerState.UNINITIALIZED).when(tracer).getState();
         GlobalTracer.init(tracer);
         configurationRegistry = ConfigurationRegistry.builder()
             .optionProviders(ServiceLoader.load(ConfigurationOptionProvider.class))
@@ -120,7 +119,8 @@ class ConfigurationExporterTest {
         assertThat(renderedDocumentation)
             .withFailMessage("The rendered configuration documentation (/docs/configuration.asciidoc) is not up-to-date.\n" +
                 "If you see this error on CI, it means you have to execute the tests locally " +
-                "(./mvnw -Dsurefire.failIfNoTests=false -Dtest=ConfigurationExporterTest -pl apm-agent -am clean test) " +
+                "(./mvnw -Dsurefire.failIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=ConfigurationExporterTest -pl apm-agent -am clean test) " +
+                "or on Windows(.\\mvnw \"-Dsurefire.failIfNoTests=false\" \"-Dsurefire.failIfNoSpecifiedTests=false\" -Dtest=ConfigurationExporterTest -pl apm-agent-builds/apm-agent -am clean test) " +
                 "which will update the rendered docs.\n" +
                 "If you see this error while running the tests locally, there's nothing more to do - the rendered docs have been updated " +
                 "and the following test execution should not have failed.")

@@ -18,8 +18,7 @@
  */
 package co.elastic.apm.agent.awssdk.v2;
 
-import co.elastic.apm.agent.awssdk.common.AbstractAwsClientIT;
-import co.elastic.apm.agent.impl.transaction.Transaction;
+import co.elastic.apm.agent.impl.transaction.TransactionImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
@@ -44,7 +43,7 @@ import javax.annotation.Nullable;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
-public class S3ClientIT extends AbstractAwsClientIT {
+public class S3ClientIT extends AbstractAws2ClientIT {
     private S3Client s3;
     private S3AsyncClient s3Async;
 
@@ -65,7 +64,7 @@ public class S3ClientIT extends AbstractAwsClientIT {
 
     @Test
     public void testS3Client() {
-        Transaction transaction = startTestRootTransaction("s3-test");
+        TransactionImpl transaction = startTestRootTransaction("s3-test");
         newTest(() -> s3.createBucket(CreateBucketRequest.builder().bucket(BUCKET_NAME).build()))
             .operationName("CreateBucket")
             .entityName(BUCKET_NAME)
@@ -133,7 +132,7 @@ public class S3ClientIT extends AbstractAwsClientIT {
 
     @Test
     public void testAsyncS3Client() {
-        Transaction transaction = startTestRootTransaction("s3-test");
+        TransactionImpl transaction = startTestRootTransaction("s3-test");
 
         newTest(() -> s3Async.createBucket(CreateBucketRequest.builder().bucket(BUCKET_NAME).build()))
             .operationName("CreateBucket")

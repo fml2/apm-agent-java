@@ -27,7 +27,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static co.elastic.apm.agent.tracer.configuration.RangeValidator.isInRange;
+
 public class WebConfiguration extends ConfigurationOptionProvider {
+
+    public static final int MAX_BODY_CAPTURE_BYTES = 1024;
 
     private static final String HTTP_CATEGORY = "HTTP";
 
@@ -121,6 +125,19 @@ public class WebConfiguration extends ConfigurationOptionProvider {
         .dynamic(true)
         .buildWithDefault(Collections.<WildcardMatcher>emptyList());
 
+    private final ConfigurationOption<Integer> captureClientRequestBytes = ConfigurationOption.integerOption()
+        .addValidator(isInRange(0, MAX_BODY_CAPTURE_BYTES))
+        .key("capture_http_client_request_body_size")
+        .configurationCategory(HTTP_CATEGORY)
+        .tags("added[1.52.0]", "experimental")
+        .description("Configures that the first n bytes of http-client request bodies shall be captured. " +
+                     "Note that only request bodies will be captured for content types matching the <<config-transaction-name-groups,`transaction_name_groups`>> configuration. " +
+                     "The maximum allowed value is " + MAX_BODY_CAPTURE_BYTES + ", a value of 0 disables body capturing.\n\n" +
+                     "Currently only support for Apache Http Client v4 and v5, HttpUrlConnection, Spring Webflux WebClient and other frameworks building on top of these (e.g. Spring RestTemplate).\n\n" +
+                     "The body will be stored in the `labels.http_request_body_content` field on the span documents.")
+        .dynamic(true)
+        .buildWithDefault(0);
+
     public List<WildcardMatcher> getIgnoreUrls() {
         return ignoreUrls.get();
     }
@@ -139,6 +156,10 @@ public class WebConfiguration extends ConfigurationOptionProvider {
 
     public List<WildcardMatcher> getCaptureContentTypes() {
         return captureContentTypes.get();
+    }
+
+    public int getCaptureClientRequestBytes() {
+        return captureClientRequestBytes.get();
     }
 
 }

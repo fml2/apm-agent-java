@@ -5,7 +5,7 @@
     <parent>
         <artifactId>apm-agent-plugins</artifactId>
         <groupId>co.elastic.apm</groupId>
-        <version>1.44.1-SNAPSHOT</version>
+        <version>1.52.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>apm-logging-plugin</artifactId>
@@ -25,15 +25,7 @@
         <module>apm-tomcat-logging-plugin</module>
         <module>apm-slf4j-plugin</module>
         <module>apm-jul-plugin</module>
+        <module>apm-log4j2-plugin-tests</module>
     </modules>
-
-    <dependencies>
-        <!-- This plugin requires further refactoring to avoid agent dependencies. -->
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>apm-agent-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-    </dependencies>
 
 </project>

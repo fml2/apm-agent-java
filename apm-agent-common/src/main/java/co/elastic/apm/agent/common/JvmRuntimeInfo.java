@@ -25,7 +25,8 @@ import javax.annotation.Nullable;
 public class JvmRuntimeInfo {
 
     private static final JvmRuntimeInfo CURRENT_VM = new JvmRuntimeInfo(System.getProperty("java.version"),
-        System.getProperty("java.vm.name"), System.getProperty("java.vendor"), System.getProperty("java.vm.version"));
+        System.getProperty("java.vm.name"), System.getProperty("java.vendor"), System.getProperty("java.vm.version"),
+        System.getProperty("os.name"));
 
     private final String javaVersion;
     private final String javaVmName;
@@ -37,6 +38,8 @@ public class JvmRuntimeInfo {
     private final boolean isJ9;
     private final boolean isHpUx;
     private final boolean isCoretto;
+    private final boolean isZos;
+    private final boolean isOs400;
 
     public static JvmRuntimeInfo ofCurrentVM() {
         return CURRENT_VM;
@@ -52,6 +55,10 @@ public class JvmRuntimeInfo {
      * @param vmVersion jvm version, from {@code System.getProperty("java.vm.version")}
      */
     public JvmRuntimeInfo(String version, String vmName, String vendorName, @Nullable String vmVersion) {
+        this(version, vmName, vendorName, vmVersion, null);
+    }
+
+    private JvmRuntimeInfo(String version, String vmName, String vendorName, @Nullable String vmVersion, @Nullable String osName) {
         javaVersion = version;
         javaVmName = vmName;
         javaVmVersion = vmVersion;
@@ -61,6 +68,8 @@ public class JvmRuntimeInfo {
         isJ9 = vmName.contains("J9");
         isHpUx = version.endsWith("-hp-ux");
         isCoretto = vendorName != null && vendorName.contains("Amazon");
+        isZos = (osName != null) && osName.toLowerCase().contains("z/os");
+        isOs400 = (osName != null) && osName.toLowerCase().contains("os/400");
 
         if (isHpUx) {
             // remove extra hp-ux suffix for parsing
@@ -146,7 +155,7 @@ public class JvmRuntimeInfo {
         return isJ9;
     }
 
-    public boolean isHpUx(){
+    public boolean isHpUx() {
         return isHpUx;
     }
 
@@ -160,6 +169,14 @@ public class JvmRuntimeInfo {
 
     public boolean isCoretto() {
         return isCoretto;
+    }
+
+    public boolean isZos() {
+        return isZos;
+    }
+
+    public boolean isOs400() {
+        return isOs400;
     }
 
     @Override

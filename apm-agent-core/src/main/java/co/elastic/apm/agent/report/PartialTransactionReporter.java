@@ -18,14 +18,15 @@
  */
 package co.elastic.apm.agent.report;
 
-import co.elastic.apm.agent.impl.transaction.Transaction;
-import co.elastic.apm.agent.objectpool.ObjectPool;
-import co.elastic.apm.agent.objectpool.ObjectPoolFactory;
+import co.elastic.apm.agent.impl.transaction.TransactionImpl;
+import co.elastic.apm.agent.objectpool.ObservableObjectPool;
+import co.elastic.apm.agent.objectpool.ObjectPoolFactoryImpl;
 import co.elastic.apm.agent.report.serialize.DslJsonSerializer;
 import co.elastic.apm.agent.report.serialize.SerializationConstants;
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
 import co.elastic.apm.agent.tracer.pooling.Allocator;
+import co.elastic.apm.agent.util.UrlConnectionUtils;
 
 import java.net.HttpURLConnection;
 
@@ -37,11 +38,11 @@ class PartialTransactionReporter {
 
     private final ApmServerClient apmServer;
 
-    private final ObjectPool<DslJsonSerializer.Writer> writerPool;
+    private final ObservableObjectPool<DslJsonSerializer.Writer> writerPool;
 
     private volatile boolean extensionSupportsPartialTransactions = true;
 
-    public PartialTransactionReporter(ApmServerClient apmServer, final DslJsonSerializer payloadSerializer, ObjectPoolFactory poolFactory) {
+    public PartialTransactionReporter(ApmServerClient apmServer, final DslJsonSerializer payloadSerializer, ObjectPoolFactoryImpl poolFactory) {
         this.apmServer = apmServer;
         writerPool = poolFactory.createRecyclableObjectPool(WRITER_POOL_SIZE, new Allocator<DslJsonSerializer.Writer>() {
             @Override
@@ -51,7 +52,7 @@ class PartialTransactionReporter {
         });
     }
 
-    public void reportPartialTransaction(Transaction transaction) {
+    public void reportPartialTransaction(TransactionImpl transaction) {
         if (!extensionSupportsPartialTransactions) {
             return;
         }
@@ -67,27 +68,30 @@ class PartialTransactionReporter {
                 logger.debug("Cannot report partial transaction because server url is not configured");
                 return;
             }
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setChunkedStreamingMode(SerializationConstants.BUFFER_SIZE);
-            connection.setRequestProperty("Content-Type", "application/vnd.elastic.apm.transaction+ndjson");
-            connection.setRequestProperty("x-elastic-aws-request-id", requestId);
-            connection.setUseCaches(false);
-            connection.connect();
 
-            DslJsonSerializer.Writer writer = writerPool.createInstance();
-            try {
-                writer.setOutputStream(connection.getOutputStream());
-                writer.blockUntilReady(); //should actually not block on AWS Lambda, as metadata is available immediately
-                writer.appendMetaDataNdJsonToStream();
-                writer.serializeTransactionNdJson(transaction);
-                writer.fullFlush();
-            } finally {
-                writerPool.recycle(writer);
+            try (UrlConnectionUtils.ContextClassloaderScope clScope = UrlConnectionUtils.withContextClassloaderOf(connection)) {
+                connection.setRequestMethod("POST");
+                connection.setDoOutput(true);
+                connection.setChunkedStreamingMode(SerializationConstants.BUFFER_SIZE);
+                connection.setRequestProperty("Content-Type", "application/vnd.elastic.apm.transaction+ndjson");
+                connection.setRequestProperty("x-elastic-aws-request-id", requestId);
+                connection.setUseCaches(false);
+                connection.connect();
+
+                DslJsonSerializer.Writer writer = writerPool.createInstance();
+                try {
+                    writer.setOutputStream(connection.getOutputStream());
+                    writer.blockUntilReady(); //should actually not block on AWS Lambda, as metadata is available immediately
+                    writer.appendMetaDataNdJsonToStream();
+                    writer.serializeTransactionNdJson(transaction);
+                    writer.fullFlush();
+                } finally {
+                    writerPool.recycle(writer);
+                }
+
+                handleResponse(connection);
+                connection.disconnect();
             }
-
-            handleResponse(connection);
-            connection.disconnect();
 
         } catch (Exception e) {
             logger.error("Failed to report partial transaction {}", transaction, e);

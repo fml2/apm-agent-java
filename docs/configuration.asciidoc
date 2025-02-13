@@ -147,6 +147,7 @@ Click on a key to get more information.
 ** <<config-transaction-ignore-user-agents>>
 ** <<config-use-path-as-transaction-name>>
 ** <<config-url-groups>>
+** <<config-capture-http-client-request-body-size>>
 * <<config-huge-traces>>
 ** <<config-span-compression-enabled>>
 ** <<config-span-compression-exact-match-max-duration>>
@@ -171,6 +172,7 @@ Click on a key to get more information.
 * <<config-messaging>>
 ** <<config-ignore-message-queues>>
 ** <<config-jms-listener-packages>>
+** <<config-rabbitmq-naming-mode>>
 * <<config-metrics>>
 ** <<config-dedot-custom-metrics>>
 ** <<config-custom-metrics-histogram-boundaries>>
@@ -178,6 +180,9 @@ Click on a key to get more information.
 ** <<config-agent-reporter-health-metrics>>
 ** <<config-agent-background-overhead-metrics>>
 * <<config-profiling>>
+** <<config-universal-profiling-integration-enabled>>
+** <<config-universal-profiling-integration-buffer-size>>
+** <<config-universal-profiling-integration-socket-dir>>
 ** <<config-profiling-inferred-spans-enabled>>
 ** <<config-profiling-inferred-spans-logging-enabled>>
 ** <<config-profiling-inferred-spans-sampling-interval>>
@@ -1266,6 +1271,7 @@ Example: `0ms`.
 ==== `central_config` (added[1.8.0])
 
 When enabled, the agent will make periodic requests to the APM Server to fetch updated configuration.
+The frequency of the periodic request is driven by the `Cache-Control` header returned from APM Server/Integration, falling back to 5 minutes if not defined.
 
 <<configuration-dynamic, image:./images/dynamic-config.svg[] >>
 
@@ -1823,6 +1829,35 @@ Prepending an element with `(?-i)` makes the matching case sensitive.
 |============
 | Java System Properties      | Property file   | Environment
 | `elastic.apm.url_groups` | `url_groups` | `ELASTIC_APM_URL_GROUPS`
+|============
+
+// This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
+[float]
+[[config-capture-http-client-request-body-size]]
+==== `capture_http_client_request_body_size` (added[1.52.0] experimental)
+
+NOTE: This feature is currently experimental, which means it is disabled by default and it is not guaranteed to be backwards compatible in future releases.
+
+Configures that the first n bytes of http-client request bodies shall be captured. Note that only request bodies will be captured for content types matching the <<config-transaction-name-groups,`transaction_name_groups`>> configuration. The maximum allowed value is 1024, a value of 0 disables body capturing.
+
+Currently only support for Apache Http Client v4 and v5, HttpUrlConnection, Spring Webflux WebClient and other frameworks building on top of these (e.g. Spring RestTemplate).
+
+The body will be stored in the `labels.http_request_body_content` field on the span documents.
+
+<<configuration-dynamic, image:./images/dynamic-config.svg[] >>
+
+
+[options="header"]
+|============
+| Default                          | Type                | Dynamic
+| `0` | Integer | true
+|============
+
+
+[options="header"]
+|============
+| Java System Properties      | Property file   | Environment
+| `elastic.apm.capture_http_client_request_body_size` | `capture_http_client_request_body_size` | `ELASTIC_APM_CAPTURE_HTTP_CLIENT_REQUEST_BODY_SIZE`
 |============
 
 [[config-huge-traces]]
@@ -2504,6 +2539,31 @@ Starting from version 1.43.0, the classes that are part of the 'application_pack
 | `elastic.apm.jms_listener_packages` | `jms_listener_packages` | `ELASTIC_APM_JMS_LISTENER_PACKAGES`
 |============
 
+// This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
+[float]
+[[config-rabbitmq-naming-mode]]
+==== `rabbitmq_naming_mode` (added[1.46.0])
+
+Defines whether the agent should use the exchanges, the routing key or the queue for the naming of RabbitMQ Transactions. Valid options are `QUEUE`, `ROUTING_KEY` and `EXCHANGE`.
+Note that `QUEUE` only works when using RabbitMQ via spring-amqp and `ROUTING_KEY` only works for the non spring-client.
+
+<<configuration-dynamic, image:./images/dynamic-config.svg[] >>
+
+Valid options: `EXCHANGE`, `QUEUE`, `ROUTING_KEY`
+
+[options="header"]
+|============
+| Default                          | Type                | Dynamic
+| `EXCHANGE` | RabbitMQNamingMode | true
+|============
+
+
+[options="header"]
+|============
+| Java System Properties      | Property file   | Environment
+| `elastic.apm.rabbitmq_naming_mode` | `rabbitmq_naming_mode` | `ELASTIC_APM_RABBITMQ_NAMING_MODE`
+|============
+
 [[config-metrics]]
 === Metrics configuration options
 
@@ -2546,6 +2606,8 @@ The first metric maps `foo` to a number and the second metric maps `foo` as an o
 NOTE: This feature is currently experimental, which means it is disabled by default and it is not guaranteed to be backwards compatible in future releases.
 
 Defines the default bucket boundaries to use for OpenTelemetry histograms.
+
+Note that for OpenTelemetry 1.32.0 or newer this setting will only work when using API only. The default buckets will not be applied when bringing your own SDK.
 
 
 
@@ -2592,9 +2654,7 @@ But if you must, you can use this option to increase the limit.
 // This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
 [float]
 [[config-agent-reporter-health-metrics]]
-==== `agent_reporter_health_metrics` (added[1.35.0] experimental)
-
-NOTE: This feature is currently experimental, which means it is disabled by default and it is not guaranteed to be backwards compatible in future releases.
+==== `agent_reporter_health_metrics` (added[1.35.0])
 
 Enables metrics which capture the health state of the agent's event reporting mechanism.
 
@@ -2617,9 +2677,7 @@ Enables metrics which capture the health state of the agent's event reporting me
 // This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
 [float]
 [[config-agent-background-overhead-metrics]]
-==== `agent_background_overhead_metrics` (added[1.35.0] experimental)
-
-NOTE: This feature is currently experimental, which means it is disabled by default and it is not guaranteed to be backwards compatible in future releases.
+==== `agent_background_overhead_metrics` (added[1.35.0])
 
 Enables metrics which capture the resource consumption of agent background tasks.
 
@@ -2645,6 +2703,77 @@ Enables metrics which capture the resource consumption of agent background tasks
 ++++
 <titleabbrev>Profiling</titleabbrev>
 ++++
+
+// This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
+[float]
+[[config-universal-profiling-integration-enabled]]
+==== `universal_profiling_integration_enabled` (added[1.50.0])
+
+If enabled, the apm agent will correlate it's transaction with the profiling data from elastic universal profiling running on the same host.
+
+
+
+
+[options="header"]
+|============
+| Default                          | Type                | Dynamic
+| `false` | Boolean | false
+|============
+
+
+[options="header"]
+|============
+| Java System Properties      | Property file   | Environment
+| `elastic.apm.universal_profiling_integration_enabled` | `universal_profiling_integration_enabled` | `ELASTIC_APM_UNIVERSAL_PROFILING_INTEGRATION_ENABLED`
+|============
+
+// This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
+[float]
+[[config-universal-profiling-integration-buffer-size]]
+==== `universal_profiling_integration_buffer_size` (added[1.50.0])
+
+The feature needs to buffer ended local-root spans for a short duration to ensure that all of its profiling data has been received.This configuration option configures the buffer size in number of spans. The higher the number of local root spans per second, the higher this buffer size should be set.
+The agent will log a warning if it is not capable of buffering a span due to insufficient buffer size. This will cause the span to be exported immediately instead with possibly incomplete profiling correlation data.
+
+
+
+
+[options="header"]
+|============
+| Default                          | Type                | Dynamic
+| `4096` | Integer | false
+|============
+
+
+[options="header"]
+|============
+| Java System Properties      | Property file   | Environment
+| `elastic.apm.universal_profiling_integration_buffer_size` | `universal_profiling_integration_buffer_size` | `ELASTIC_APM_UNIVERSAL_PROFILING_INTEGRATION_BUFFER_SIZE`
+|============
+
+// This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
+[float]
+[[config-universal-profiling-integration-socket-dir]]
+==== `universal_profiling_integration_socket_dir` (added[1.50.0])
+
+The extension needs to bind a socket to a file for communicating with the universal profiling host agent.This configuration option can be used to change the location. Note that the total path name (including the socket) must not exceed 100 characters due to OS restrictions.
+If unset, the value of the `java.io.tmpdir` system property will be used.
+
+
+
+
+[options="header"]
+|============
+| Default                          | Type                | Dynamic
+| `<none>` | String | false
+|============
+
+
+[options="header"]
+|============
+| Java System Properties      | Property file   | Environment
+| `elastic.apm.universal_profiling_integration_socket_dir` | `universal_profiling_integration_socket_dir` | `ELASTIC_APM_UNIVERSAL_PROFILING_INTEGRATION_SOCKET_DIR`
+|============
 
 // This file is auto generated. Please make your changes in *Configuration.java (for example CoreConfiguration.java) and execute ConfigurationExporter
 [float]
@@ -2689,7 +2818,7 @@ NOTE: This feature is not available on Windows and on OpenJ9
 ==== `profiling_inferred_spans_logging_enabled` (added[1.37.0])
 
 By default, async profiler prints warning messages about missing JVM symbols to standard output. 
-Set this option to `true` to suppress such messages
+Set this option to `false` to suppress such messages
 
 <<configuration-dynamic, image:./images/dynamic-config.svg[] >>
 
@@ -3959,6 +4088,7 @@ Example: `5ms`.
 # trace_methods_duration_threshold=0ms
 
 # When enabled, the agent will make periodic requests to the APM Server to fetch updated configuration.
+# The frequency of the periodic request is driven by the `Cache-Control` header returned from APM Server/Integration, falling back to 5 minutes if not defined.
 #
 # This setting can be changed at runtime
 # Type: Boolean
@@ -4228,6 +4358,18 @@ Example: `5ms`.
 # Default value: 
 #
 # url_groups=
+
+# Configures that the first n bytes of http-client request bodies shall be captured. Note that only request bodies will be captured for content types matching the <<config-transaction-name-groups,`transaction_name_groups`>> configuration. The maximum allowed value is 1024, a value of 0 disables body capturing.
+# 
+# Currently only support for Apache Http Client v4 and v5, HttpUrlConnection, Spring Webflux WebClient and other frameworks building on top of these (e.g. Spring RestTemplate).
+# 
+# The body will be stored in the `labels.http_request_body_content` field on the span documents.
+#
+# This setting can be changed at runtime
+# Type: Integer
+# Default value: 0
+#
+# capture_http_client_request_body_size=0
 
 ############################################
 # Huge Traces                              #
@@ -4601,6 +4743,16 @@ Example: `5ms`.
 #
 # jms_listener_packages=
 
+# Defines whether the agent should use the exchanges, the routing key or the queue for the naming of RabbitMQ Transactions. Valid options are `QUEUE`, `ROUTING_KEY` and `EXCHANGE`.
+# Note that `QUEUE` only works when using RabbitMQ via spring-amqp and `ROUTING_KEY` only works for the non spring-client.
+#
+# Valid options: EXCHANGE, QUEUE, ROUTING_KEY
+# This setting can be changed at runtime
+# Type: RabbitMQNamingMode
+# Default value: EXCHANGE
+#
+# rabbitmq_naming_mode=EXCHANGE
+
 ############################################
 # Metrics                                  #
 ############################################
@@ -4618,6 +4770,8 @@ Example: `5ms`.
 # dedot_custom_metrics=true
 
 # Defines the default bucket boundaries to use for OpenTelemetry histograms.
+# 
+# Note that for OpenTelemetry 1.32.0 or newer this setting will only work when using API only. The default buckets will not be applied when bringing your own SDK.
 #
 # This setting can not be changed at runtime. Changes require a restart of the application.
 # Type: comma separated list
@@ -4656,6 +4810,32 @@ Example: `5ms`.
 # Profiling                                #
 ############################################
 
+# If enabled, the apm agent will correlate it's transaction with the profiling data from elastic universal profiling running on the same host.
+#
+# This setting can not be changed at runtime. Changes require a restart of the application.
+# Type: Boolean
+# Default value: false
+#
+# universal_profiling_integration_enabled=false
+
+# The feature needs to buffer ended local-root spans for a short duration to ensure that all of its profiling data has been received.This configuration option configures the buffer size in number of spans. The higher the number of local root spans per second, the higher this buffer size should be set.
+# The agent will log a warning if it is not capable of buffering a span due to insufficient buffer size. This will cause the span to be exported immediately instead with possibly incomplete profiling correlation data.
+#
+# This setting can not be changed at runtime. Changes require a restart of the application.
+# Type: Integer
+# Default value: 4096
+#
+# universal_profiling_integration_buffer_size=4096
+
+# The extension needs to bind a socket to a file for communicating with the universal profiling host agent.This configuration option can be used to change the location. Note that the total path name (including the socket) must not exceed 100 characters due to OS restrictions.
+# If unset, the value of the `java.io.tmpdir` system property will be used.
+#
+# This setting can not be changed at runtime. Changes require a restart of the application.
+# Type: String
+# Default value: 
+#
+# universal_profiling_integration_socket_dir=
+
 # Set to `true` to make the agent create spans for method executions based on
 # https://github.com/jvm-profiling-tools/async-profiler[async-profiler], a sampling aka statistical profiler.
 # 
@@ -4677,7 +4857,7 @@ Example: `5ms`.
 # profiling_inferred_spans_enabled=false
 
 # By default, async profiler prints warning messages about missing JVM symbols to standard output. 
-# Set this option to `true` to suppress such messages
+# Set this option to `false` to suppress such messages
 #
 # This setting can be changed at runtime
 # Type: Boolean

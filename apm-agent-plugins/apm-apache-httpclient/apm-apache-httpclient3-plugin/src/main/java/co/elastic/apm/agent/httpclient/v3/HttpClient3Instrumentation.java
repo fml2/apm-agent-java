@@ -23,11 +23,12 @@ import co.elastic.apm.agent.sdk.ElasticApmInstrumentation;
 import co.elastic.apm.agent.sdk.internal.util.LoggerUtils;
 import co.elastic.apm.agent.sdk.logging.Logger;
 import co.elastic.apm.agent.sdk.logging.LoggerFactory;
-import co.elastic.apm.agent.tracer.ElasticContext;
+import co.elastic.apm.agent.tracer.TraceState;
 import co.elastic.apm.agent.tracer.GlobalTracer;
 import co.elastic.apm.agent.tracer.Outcome;
 import co.elastic.apm.agent.tracer.Span;
 import co.elastic.apm.agent.tracer.Tracer;
+import co.elastic.apm.agent.tracer.configuration.CoreConfiguration;
 import net.bytebuddy.asm.Advice;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.type.TypeDescription;
@@ -95,7 +96,7 @@ public class HttpClient3Instrumentation extends ElasticApmInstrumentation {
 
         @Nullable
         private static Span<?> startClientSpan(HttpMethod httpMethod, HostConfiguration hostConfiguration) {
-            final ElasticContext<?> activeContext = tracer.currentContext();
+            final TraceState<?> activeContext = tracer.currentContext();
             if (activeContext.getSpan() == null) {
                 return null;
             }
@@ -146,8 +147,10 @@ public class HttpClient3Instrumentation extends ElasticApmInstrumentation {
                 span.getContext().getHttp().withStatusCode(statusLine.getStatusCode());
             }
 
-            if (thrown instanceof CircularRedirectException) {
-                span.withOutcome(Outcome.FAILURE);
+            if(thrown != null && !tracer.getConfig(CoreConfiguration.class).isAvoidTouchingExceptions()) {
+                if (thrown instanceof CircularRedirectException) {
+                    span.withOutcome(Outcome.FAILURE);
+                }
             }
 
             span.captureException(thrown)

@@ -19,8 +19,9 @@
 package co.elastic.apm.agent.httpclient.v4.helper;
 
 import co.elastic.apm.agent.httpclient.HttpClientHelper;
-import co.elastic.apm.agent.tracer.ElasticContext;
+import co.elastic.apm.agent.httpclient.common.RequestBodyCaptureRegistry;
 import co.elastic.apm.agent.tracer.Span;
+import co.elastic.apm.agent.tracer.TraceState;
 import co.elastic.apm.agent.tracer.pooling.Recyclable;
 import org.apache.http.HttpException;
 import org.apache.http.HttpHost;
@@ -35,16 +36,16 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 public class HttpAsyncRequestProducerWrapper implements HttpAsyncRequestProducer, Recyclable {
-    private final ApacheHttpAsyncClientHelper asyncClientHelper;
+    private final ApacheHttpClient4AsyncHelper asyncClientHelper;
     private volatile HttpAsyncRequestProducer delegate;
 
     @Nullable
-    private ElasticContext<?> toPropagate;
+    private TraceState<?> toPropagate;
 
     @Nullable
     private Span<?> span;
 
-    HttpAsyncRequestProducerWrapper(ApacheHttpAsyncClientHelper helper) {
+    HttpAsyncRequestProducerWrapper(ApacheHttpClient4AsyncHelper helper) {
         this.asyncClientHelper = helper;
     }
 
@@ -59,7 +60,7 @@ public class HttpAsyncRequestProducerWrapper implements HttpAsyncRequestProducer
      * @return the {@link HttpAsyncRequestProducer} wrapper
      */
     public HttpAsyncRequestProducerWrapper with(HttpAsyncRequestProducer delegate, @Nullable Span<?> span,
-                                                ElasticContext<?> toPropagate) {
+                                                TraceState<?> toPropagate) {
         // Order is important due to visibility - write to delegate last on this (initiating) thread
         this.span = span;
         toPropagate.incrementReferences();
@@ -85,6 +86,7 @@ public class HttpAsyncRequestProducerWrapper implements HttpAsyncRequestProducer
         // trace context propagation
         if (request != null) {
             if (span != null) {
+                RequestBodyCaptureRegistry.potentiallyCaptureRequestBody(request, span, ApacheHttpClient4ApiAdapter.get(), RequestHeaderAccessor.INSTANCE);
                 RequestLine requestLine = request.getRequestLine();
                 if (requestLine != null) {
                     String method = requestLine.getMethod();
